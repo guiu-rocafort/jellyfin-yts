@@ -61,7 +61,11 @@ public class DownloadCoordinator
         });
     }
 
-    public IReadOnlyCollection<PendingDownload> ListPending() => _store.All();
+    public IReadOnlyCollection<PendingDownload> ListPending() =>
+        _store.All().Where(p => p.State != PendingState.Completed).ToList();
+
+    public bool IsDownloaded(string hash) =>
+        _store.All().Any(p => p.State == PendingState.Completed && string.Equals(p.Hash, hash, StringComparison.OrdinalIgnoreCase));
 
     public async Task PollAndImportAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
@@ -83,6 +87,8 @@ public class DownloadCoordinator
                 }
 
                 _consecutiveFailures.TryRemove(pending.Hash, out _);
+                pending.Progress = info.Progress;
+                pending.QbState = info.State;
 
                 if (info.IsComplete)
                 {
@@ -108,6 +114,13 @@ public class DownloadCoordinator
                 progress.Report(processed * 100d / total);
             }
         }
+
+        // One batch save covers progress/state updates for items that didn't hit ImportAsync/Fail
+        // this tick (those already saved themselves) -- cheaper than saving per item above.
+        if (pendingItems.Count > 0)
+        {
+            _store.Save();
+        }
     }
 
     private async Task ImportAsync(PendingDownload pending, TorrentInfo info, PluginConfiguration config, CancellationToken cancellationToken)
@@ -127,7 +140,8 @@ public class DownloadCoordinator
                 await _downloadClient.DeleteAsync(pending.Hash, deleteFiles, cancellationToken).ConfigureAwait(false);
             }
 
-            _store.Remove(pending.Hash);
+            pending.State = PendingState.Completed;
+            _store.Save();
         }
         catch (Exception ex)
         {

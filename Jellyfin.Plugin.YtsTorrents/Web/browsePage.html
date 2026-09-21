@@ -61,13 +61,16 @@
 
                 var html = movies.map(function (movie) {
                     var rows = (movie.Torrents || []).map(function (torrent) {
+                        var actionCell = torrent.Downloaded
+                            ? '<span style="color: #5cb85c;">Downloaded</span>'
+                            : '<button is="emby-button" class="raised emby-button yts-download-btn" ' +
+                              'data-movie-id="' + escapeHtml(movie.MovieId) + '" data-hash="' + escapeHtml(torrent.Hash) + '">' +
+                              '<span>Download</span></button>';
                         return '<tr>' +
                             '<td>' + escapeHtml(torrent.Quality) + ' (' + escapeHtml(torrent.Type) + ')</td>' +
                             '<td>' + escapeHtml(torrent.Size) + '</td>' +
                             '<td>' + escapeHtml(torrent.Seeds) + ' / ' + escapeHtml(torrent.Peers) + '</td>' +
-                            '<td><button is="emby-button" class="raised emby-button yts-download-btn" ' +
-                            'data-movie-id="' + escapeHtml(movie.MovieId) + '" data-hash="' + escapeHtml(torrent.Hash) + '">' +
-                            '<span>Download</span></button></td>' +
+                            '<td>' + actionCell + '</td>' +
                             '</tr>';
                     }).join('');
 
@@ -104,6 +107,32 @@
                 });
             }
 
+            // qBittorrent's raw torrent states, mapped to short human-readable labels. Falls back to
+            // the raw state string for anything not listed here (e.g. rarer states), so nothing is
+            // ever hidden from the user, just not specially worded.
+            var QB_STATE_LABELS = {
+                downloading: 'Downloading',
+                forcedDL: 'Downloading (forced)',
+                metaDL: 'Fetching metadata',
+                forcedMetaDL: 'Fetching metadata (forced)',
+                stalledDL: 'Stalled (no peers)',
+                queuedDL: 'Queued',
+                pausedDL: 'Paused',
+                stoppedDL: 'Paused',
+                checkingDL: 'Checking files',
+                checkingResumeData: 'Checking files',
+                allocating: 'Allocating disk space',
+                moving: 'Moving files',
+            };
+
+            function progressBarHtml(fraction) {
+                var pct = Math.round((fraction || 0) * 1000) / 10;
+                return '<div style="background:rgba(255,255,255,0.15);border-radius:4px;overflow:hidden;height:6px;min-width:90px;">' +
+                    '<div style="background:#00a4dc;height:100%;width:' + pct + '%;"></div>' +
+                    '</div>' +
+                    '<div style="font-size:0.85em;margin-top:2px;">' + pct.toFixed(1) + '%</div>';
+            }
+
             function renderDownloads(items) {
                 var container = document.querySelector('#YtsDownloadsList');
                 if (!items || items.length === 0) {
@@ -112,12 +141,26 @@
                 }
 
                 var rows = items.map(function (item) {
-                    var statusText = escapeHtml(item.State) + (item.LastError ? ' &mdash; ' + escapeHtml(item.LastError) : '');
+                    var statusText;
+                    var progressCell;
+
+                    if (item.State === 'Downloading') {
+                        statusText = escapeHtml(QB_STATE_LABELS[item.QbState] || item.QbState || 'Downloading');
+                        progressCell = progressBarHtml(item.Progress);
+                    } else if (item.State === 'Failed') {
+                        statusText = 'Failed' + (item.LastError ? ' &mdash; ' + escapeHtml(item.LastError) : '');
+                        progressCell = '&mdash;';
+                    } else {
+                        statusText = escapeHtml(item.State);
+                        progressCell = '&mdash;';
+                    }
+
                     return '<tr><td>' + escapeHtml(item.MovieTitle) + ' (' + escapeHtml(item.Year) + ')</td>' +
-                        '<td>' + statusText + '</td></tr>';
+                        '<td>' + statusText + '</td>' +
+                        '<td>' + progressCell + '</td></tr>';
                 }).join('');
 
-                container.innerHTML = '<table class="detailTable"><thead><tr><th>Movie</th><th>Status</th></tr></thead>' +
+                container.innerHTML = '<table class="detailTable"><thead><tr><th>Movie</th><th>Status</th><th>Progress</th></tr></thead>' +
                     '<tbody>' + rows + '</tbody></table>';
             }
 

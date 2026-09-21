@@ -32,6 +32,25 @@ public class QBittorrentClient : IDownloadClient
 
     private static string BaseUrl => (Plugin.Instance?.Configuration.QbUrl ?? "http://localhost:8080").TrimEnd('/');
 
+    public async Task TestConnectionAsync(string url, string username, string password, CancellationToken cancellationToken)
+    {
+        var baseUrl = (url ?? string.Empty).TrimEnd('/');
+        if (baseUrl.Length == 0)
+        {
+            throw new QBittorrentException("qBittorrent WebUI URL is empty.");
+        }
+
+        // A throwaway client/cookie jar, not the shared _httpClient -- testing (possibly wrong,
+        // unsaved) credentials here must never disturb the authenticated session used for real
+        // downloads in the background.
+        var cookieContainer = new CookieContainer();
+        using var handler = new HttpClientHandler { CookieContainer = cookieContainer };
+        using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(10) };
+
+        var response = await PostLoginAsync(client, baseUrl, username, password, cancellationToken).ConfigureAwait(false);
+        await EnsureLoginSucceededAsync(response, cancellationToken).ConfigureAwait(false);
+    }
+
     public async Task EnsureCategoryAsync(string category, string savePath, CancellationToken cancellationToken)
     {
         var existing = await ExecuteWithAuthAsync(
@@ -128,25 +147,44 @@ public class QBittorrentClient : IDownloadClient
     private async Task LoginAsync(CancellationToken cancellationToken)
     {
         var config = Plugin.Instance?.Configuration;
+        var response = await PostLoginAsync(_httpClient, BaseUrl, config?.QbUsername ?? string.Empty, config?.QbPassword ?? string.Empty, cancellationToken)
+            .ConfigureAwait(false);
+        await EnsureLoginSucceededAsync(response, cancellationToken).ConfigureAwait(false);
+
+        _authenticated = true;
+        _logger.LogDebug("Authenticated with qBittorrent at {Url}", BaseUrl);
+    }
+
+    private static async Task<HttpResponseMessage> PostLoginAsync(HttpClient client, string baseUrl, string username, string password, CancellationToken cancellationToken)
+    {
         var form = new FormUrlEncodedContent(new[]
         {
-            new System.Collections.Generic.KeyValuePair<string, string>("username", config?.QbUsername ?? string.Empty),
-            new System.Collections.Generic.KeyValuePair<string, string>("password", config?.QbPassword ?? string.Empty),
+            new System.Collections.Generic.KeyValuePair<string, string>("username", username),
+            new System.Collections.Generic.KeyValuePair<string, string>("password", password),
         });
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, $"{BaseUrl}/api/v2/auth/login") { Content = form };
-        request.Headers.Referrer = new Uri(BaseUrl);
-
-        HttpResponseMessage response;
         try
         {
-            response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            using var request = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/api/v2/auth/login") { Content = form };
+            request.Headers.Referrer = new Uri(baseUrl);
+            return await client.SendAsync(request, cancellationToken).ConfigureAwait(false);
         }
         catch (HttpRequestException ex)
         {
             throw new QBittorrentException("Could not reach qBittorrent: " + ex.Message, ex);
         }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new QBittorrentException("Connection to qBittorrent timed out.", ex);
+        }
+        catch (UriFormatException ex)
+        {
+            throw new QBittorrentException("qBittorrent WebUI URL is not a valid URL: " + ex.Message, ex);
+        }
+    }
 
+    private static async Task EnsureLoginSucceededAsync(HttpResponseMessage response, CancellationToken cancellationToken)
+    {
         var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
         // qBittorrent's login endpoint has returned different bodies across versions: older builds send
@@ -158,9 +196,6 @@ public class QBittorrentClient : IDownloadClient
         {
             throw new QBittorrentException($"qBittorrent login failed (HTTP {(int)response.StatusCode}): {body}");
         }
-
-        _authenticated = true;
-        _logger.LogDebug("Authenticated with qBittorrent at {Url}", BaseUrl);
     }
 
     private sealed class TorrentInfoDto

@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.YtsTorrents.Api.Dto;
 using Jellyfin.Plugin.YtsTorrents.Downloads;
+using Jellyfin.Plugin.YtsTorrents.QBittorrent;
 using Jellyfin.Plugin.YtsTorrents.Yts;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
@@ -20,12 +21,18 @@ public class YtsTorrentsController : ControllerBase
 {
     private readonly IYtsClient _ytsClient;
     private readonly DownloadCoordinator _coordinator;
+    private readonly IDownloadClient _downloadClient;
     private readonly ILogger<YtsTorrentsController> _logger;
 
-    public YtsTorrentsController(IYtsClient ytsClient, DownloadCoordinator coordinator, ILogger<YtsTorrentsController> logger)
+    public YtsTorrentsController(
+        IYtsClient ytsClient,
+        DownloadCoordinator coordinator,
+        IDownloadClient downloadClient,
+        ILogger<YtsTorrentsController> logger)
     {
         _ytsClient = ytsClient;
         _coordinator = coordinator;
+        _downloadClient = downloadClient;
         _logger = logger;
     }
 
@@ -42,7 +49,7 @@ public class YtsTorrentsController : ControllerBase
         try
         {
             var movies = await _ytsClient.SearchAsync(query, 20, cancellationToken).ConfigureAwait(false);
-            var results = movies.Select(ToDto).ToArray();
+            var results = movies.Select(m => ToDto(m, _coordinator)).ToArray();
             return Ok(results);
         }
         catch (YtsUnavailableException ex)
@@ -91,20 +98,35 @@ public class YtsTorrentsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("TestConnection")]
+    [ProducesResponseType(StatusCodes.Status200OK)]
+    public async Task<ActionResult<TestConnectionResultDto>> TestConnection([FromBody] TestConnectionRequestDto request, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await _downloadClient.TestConnectionAsync(request.QbUrl, request.QbUsername, request.QbPassword, cancellationToken).ConfigureAwait(false);
+            return Ok(new TestConnectionResultDto(true, "Connected successfully."));
+        }
+        catch (QBittorrentException ex)
+        {
+            return Ok(new TestConnectionResultDto(false, ex.Message));
+        }
+    }
+
     [HttpGet("Downloads")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public ActionResult<PendingDownloadDto[]> ListPending()
     {
         var dtos = _coordinator.ListPending()
-            .Select(p => new PendingDownloadDto(p.Hash, p.MovieTitle, p.Year, p.State.ToString(), p.LastError, p.AddedUtc))
+            .Select(p => new PendingDownloadDto(p.Hash, p.MovieTitle, p.Year, p.State.ToString(), p.LastError, p.AddedUtc, p.Progress, p.QbState))
             .ToArray();
         return Ok(dtos);
     }
 
-    private static SearchResultDto ToDto(YtsMovie movie)
+    private static SearchResultDto ToDto(YtsMovie movie, DownloadCoordinator coordinator)
     {
         var torrents = movie.Torrents
-            .Select(t => new TorrentDto(t.Hash, t.Quality, t.Type, t.Size, t.Seeds, t.Peers))
+            .Select(t => new TorrentDto(t.Hash, t.Quality, t.Type, t.Size, t.Seeds, t.Peers, coordinator.IsDownloaded(t.Hash)))
             .ToArray();
         return new SearchResultDto(movie.Id, movie.Title, movie.Year, movie.Rating, torrents);
     }

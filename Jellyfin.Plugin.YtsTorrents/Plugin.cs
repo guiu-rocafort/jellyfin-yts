@@ -30,15 +30,25 @@ public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
     {
         return new[]
         {
+            // Listed first so Jellyfin's "Settings" button on the plugin's own detail page resolves
+            // to this one (it picks the first EnableInMainMenu candidate, falling back to array
+            // order) -- both pages also get their own persistent link under the dashboard sidebar's
+            // "Plugins" section via EnableInMainMenu, which is the only UI path to the Browse page.
             new PluginPageInfo
             {
                 Name = "YtsTorrentsConfig",
+                DisplayName = "YTS Torrents Settings",
                 EmbeddedResourcePath = string.Format("{0}.Configuration.configPage.html", GetType().Namespace),
+                EnableInMainMenu = true,
+                MenuIcon = "settings",
             },
             new PluginPageInfo
             {
                 Name = "YtsTorrentsBrowse",
+                DisplayName = "YTS Torrents",
                 EmbeddedResourcePath = string.Format("{0}.Web.browsePage.html", GetType().Namespace),
+                EnableInMainMenu = true,
+                MenuIcon = "movie",
             },
         };
     }

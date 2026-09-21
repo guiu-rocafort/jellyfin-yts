@@ -44,12 +44,6 @@ public class PendingDownloadStore
         Save();
     }
 
-    public void Remove(string hash)
-    {
-        _items.TryRemove(hash, out _);
-        Save();
-    }
-
     public void Save()
     {
         lock (_fileLock)
