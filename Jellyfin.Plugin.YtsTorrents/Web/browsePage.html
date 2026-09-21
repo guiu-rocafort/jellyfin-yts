@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>YTS Torrents</title>
+</head>
+<body>
+    <div id="YtsTorrentsBrowsePage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button">
+        <div data-role="content">
+            <div class="content-primary">
+                <div class="verticalSection">
+                    <h2>YTS Torrents</h2>
+                    <form id="YtsTorrentsSearchForm">
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="YtsSearchQuery" label="Search YTS" placeholder="Movie title..." />
+                        </div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Search</span>
+                        </button>
+                    </form>
+                </div>
+
+                <div class="verticalSection">
+                    <h3>Results</h3>
+                    <div id="YtsSearchResults"></div>
+                </div>
+
+                <div class="verticalSection">
+                    <h3>Downloads</h3>
+                    <div id="YtsDownloadsList"></div>
+                </div>
+            </div>
+        </div>
+        <!-- This <script> MUST be a descendant of the div[data-role="page"] above, not a sibling after
+             it: Jellyfin's viewContainer.js parseHtml() extracts only that div (via
+             wrapper.querySelector('div[data-role="page"]')) when loading this page, so anything
+             outside it -- including a sibling <script> -- is silently discarded and never runs. -->
+        <script type="text/javascript">
+        (function () {
+            var pollHandle = null;
+
+            function searchUrl(query) {
+                return ApiClient.getUrl('Plugins/YtsTorrents/Search', { query: query });
+            }
+
+            function downloadsUrl() {
+                return ApiClient.getUrl('Plugins/YtsTorrents/Downloads');
+            }
+
+            function escapeHtml(text) {
+                var div = document.createElement('div');
+                div.textContent = text == null ? '' : String(text);
+                return div.innerHTML;
+            }
+
+            function renderResults(movies) {
+                var container = document.querySelector('#YtsSearchResults');
+                if (!movies || movies.length === 0) {
+                    container.innerHTML = '<p>No results.</p>';
+                    return;
+                }
+
+                var html = movies.map(function (movie) {
+                    var rows = (movie.Torrents || []).map(function (torrent) {
+                        return '<tr>' +
+                            '<td>' + escapeHtml(torrent.Quality) + ' (' + escapeHtml(torrent.Type) + ')</td>' +
+                            '<td>' + escapeHtml(torrent.Size) + '</td>' +
+                            '<td>' + escapeHtml(torrent.Seeds) + ' / ' + escapeHtml(torrent.Peers) + '</td>' +
+                            '<td><button is="emby-button" class="raised emby-button yts-download-btn" ' +
+                            'data-movie-id="' + escapeHtml(movie.MovieId) + '" data-hash="' + escapeHtml(torrent.Hash) + '">' +
+                            '<span>Download</span></button></td>' +
+                            '</tr>';
+                    }).join('');
+
+                    return '<div class="yts-movie">' +
+                        '<h4>' + escapeHtml(movie.Title) + ' (' + escapeHtml(movie.Year) + ') &ndash; ' + escapeHtml(movie.Rating) + '/10</h4>' +
+                        '<table class="detailTable"><thead><tr><th>Quality</th><th>Size</th><th>Seeds/Peers</th><th></th></tr></thead>' +
+                        '<tbody>' + rows + '</tbody></table>' +
+                        '</div>';
+                }).join('');
+
+                container.innerHTML = html;
+
+                container.querySelectorAll('.yts-download-btn').forEach(function (btn) {
+                    btn.addEventListener('click', function () {
+                        startDownload(btn.getAttribute('data-movie-id'), btn.getAttribute('data-hash'));
+                    });
+                });
+            }
+
+            function startDownload(movieId, hash) {
+                Dashboard.showLoadingMsg();
+                ApiClient.ajax({
+                    url: downloadsUrl(),
+                    type: 'POST',
+                    data: JSON.stringify({ MovieId: parseInt(movieId, 10), Hash: hash }),
+                    contentType: 'application/json'
+                }).then(function () {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Download started.');
+                    refreshDownloads();
+                }).catch(function (err) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Could not start download: ' + (err && err.statusText ? err.statusText : 'unknown error'));
+                });
+            }
+
+            function renderDownloads(items) {
+                var container = document.querySelector('#YtsDownloadsList');
+                if (!items || items.length === 0) {
+                    container.innerHTML = '<p>Nothing pending.</p>';
+                    return;
+                }
+
+                var rows = items.map(function (item) {
+                    var statusText = escapeHtml(item.State) + (item.LastError ? ' &mdash; ' + escapeHtml(item.LastError) : '');
+                    return '<tr><td>' + escapeHtml(item.MovieTitle) + ' (' + escapeHtml(item.Year) + ')</td>' +
+                        '<td>' + statusText + '</td></tr>';
+                }).join('');
+
+                container.innerHTML = '<table class="detailTable"><thead><tr><th>Movie</th><th>Status</th></tr></thead>' +
+                    '<tbody>' + rows + '</tbody></table>';
+            }
+
+            function refreshDownloads() {
+                ApiClient.ajax({
+                    url: downloadsUrl(),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(renderDownloads);
+            }
+
+            document.querySelector('#YtsTorrentsBrowsePage').addEventListener('pageshow', function () {
+                refreshDownloads();
+                pollHandle = window.setInterval(refreshDownloads, 5000);
+            });
+
+            document.querySelector('#YtsTorrentsBrowsePage').addEventListener('pagehide', function () {
+                if (pollHandle) {
+                    window.clearInterval(pollHandle);
+                    pollHandle = null;
+                }
+            });
+
+            document.querySelector('#YtsTorrentsSearchForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                var query = document.querySelector('#YtsSearchQuery').value;
+                if (!query) {
+                    return false;
+                }
+
+                Dashboard.showLoadingMsg();
+                ApiClient.ajax({
+                    url: searchUrl(query),
+                    type: 'GET',
+                    dataType: 'json'
+                }).then(function (movies) {
+                    Dashboard.hideLoadingMsg();
+                    renderResults(movies);
+                }).catch(function (err) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Search failed: ' + (err && err.statusText ? err.statusText : 'unknown error'));
+                });
+
+                return false;
+            });
+        })();
+        </script>
+    </div>
+</body>
+</html>

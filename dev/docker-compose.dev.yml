@@ -1,0 +1,41 @@
+# Local end-to-end test stack for the YTS Torrents plugin.
+#
+# Jellyfin and qBittorrent share the same host path family (./data/shared/...) so that
+# ImportMode.Hardlink actually hardlinks instead of falling back to a copy -- if they saw different
+# filesystems, hardlinking would hit EXDEV. This is the single most common misconfiguration when
+# running the two apps in separate containers.
+#
+# Usage (from the repo root):
+#   ./publish.sh dev/data/jellyfin/config/plugins/YtsTorrents_0.1.0.0
+#   docker compose -f dev/docker-compose.dev.yml up -d
+#   open http://localhost:8096 (Jellyfin) and http://localhost:8081 (qBittorrent WebUI)
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:12.1
+    container_name: yts-dev-jellyfin
+    ports:
+      - "8096:8096"
+    volumes:
+      - ./data/jellyfin/config:/config
+      - ./data/jellyfin/cache:/cache
+      - ./data/shared/media:/media
+      # Same host path qBittorrent sees as /downloads -- the plugin's import step runs inside this
+      # container and reads qBittorrent's `content_path` (e.g. /downloads/Sintel) directly, so Jellyfin
+      # needs that same path mounted too, not just /media.
+      - ./data/shared/downloads:/downloads
+    restart: unless-stopped
+
+  qbittorrent:
+    image: linuxserver/qbittorrent:latest
+    container_name: yts-dev-qbittorrent
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Etc/UTC
+      - WEBUI_PORT=8081
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./data/qbittorrent/config:/config
+      - ./data/shared/downloads:/downloads
+    restart: unless-stopped

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>YTS Torrents</title>
+</head>
+<body>
+    <div id="YtsTorrentsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
+        <div data-role="content">
+            <div class="content-primary">
+                <form id="YtsTorrentsConfigForm">
+                    <div class="verticalSection">
+                        <h2>YTS Torrents</h2>
+                        <p>Search YTS and send torrents to qBittorrent for download; finished movies are moved into the library folder below and a library scan is triggered automatically.</p>
+                    </div>
+
+                    <h3>YTS</h3>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="YtsBaseUrl" label="YTS API base URL" />
+                        <div class="fieldDescription">Default: https://yts.gg/api/v2 (fallback mirror: https://movies-api.accel.li/api/v2)</div>
+                    </div>
+
+                    <h3>qBittorrent</h3>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="QbUrl" label="qBittorrent WebUI URL" />
+                        <div class="fieldDescription">e.g. http://qbittorrent:8080. Firewall this port to the Jellyfin host only &mdash; credentials below are stored unencrypted, the same way other Jellyfin plugins store third-party credentials.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="QbUsername" label="qBittorrent username" />
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="password" id="QbPassword" label="qBittorrent password" />
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="QbCategory" label="qBittorrent category" />
+                        <div class="fieldDescription">A dedicated category is created in qBittorrent for torrents this plugin adds, so it can tell them apart from your other torrents.</div>
+                    </div>
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="QbStagingSavePath" label="Staging save path (qBittorrent's filesystem view)" />
+                        <div class="fieldDescription">Where qBittorrent downloads files to before they're imported. Must NOT be inside a Jellyfin library folder, so partially-downloaded files are never scanned.</div>
+                    </div>
+
+                    <h3>Library</h3>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="LibraryFolderPath" label="Destination library folder"></select>
+                        <div class="fieldDescription">Finished movies are placed here as "Title (Year)/" folders, matching Jellyfin's standard naming convention.</div>
+                    </div>
+                    <div class="selectContainer">
+                        <select is="emby-select" id="ImportMode" label="Import mode">
+                            <option value="Hardlink">Hardlink (fastest, needs same filesystem as qBittorrent's download path)</option>
+                            <option value="Move">Move</option>
+                            <option value="Copy">Copy (keeps the qBittorrent copy intact)</option>
+                        </select>
+                    </div>
+                    <div class="checkboxContainer">
+                        <label>
+                            <input is="emby-checkbox" type="checkbox" id="DeleteFromQbAfterImport" />
+                            <span>Remove the torrent from qBittorrent after a successful import</span>
+                        </label>
+                        <div class="fieldDescription">Downloaded files are only removed from disk if the import mode is Move (Hardlink/Copy leave the qBittorrent copy alone).</div>
+                    </div>
+
+                    <div>
+                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                            <span>Save</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <!-- This <script> MUST be a descendant of the div[data-role="page"] above, not a sibling after
+             it: Jellyfin's viewContainer.js parseHtml() extracts only that div (via
+             wrapper.querySelector('div[data-role="page"]')) when loading this page, so anything
+             outside it -- including a sibling <script> -- is silently discarded and never runs. -->
+        <script type="text/javascript">
+        (function () {
+            var pluginId = '050cf8c8-72cc-49c4-8522-bf98c4b1b9aa';
+
+            function populateLibraryFolders(selectedPath) {
+                var select = document.querySelector('#LibraryFolderPath');
+                return ApiClient.getVirtualFolders().then(function (folders) {
+                    select.innerHTML = '';
+                    folders.forEach(function (folder) {
+                        (folder.Locations || []).forEach(function (location) {
+                            var option = document.createElement('option');
+                            option.value = location;
+                            option.text = folder.Name + ' (' + location + ')';
+                            if (location === selectedPath) {
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+                    });
+                });
+            }
+
+            document.querySelector('#YtsTorrentsConfigPage')
+                .addEventListener('pageshow', function () {
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        document.querySelector('#YtsBaseUrl').value = config.YtsBaseUrl || '';
+                        document.querySelector('#QbUrl').value = config.QbUrl || '';
+                        document.querySelector('#QbUsername').value = config.QbUsername || '';
+                        document.querySelector('#QbPassword').value = config.QbPassword || '';
+                        document.querySelector('#QbCategory').value = config.QbCategory || '';
+                        document.querySelector('#QbStagingSavePath').value = config.QbStagingSavePath || '';
+                        document.querySelector('#ImportMode').value = config.ImportMode || 'Hardlink';
+                        document.querySelector('#DeleteFromQbAfterImport').checked = !!config.DeleteFromQbAfterImport;
+                        return populateLibraryFolders(config.LibraryFolderPath);
+                    }).catch(function (err) {
+                        console.error('[YtsTorrents] config page load failed', err);
+                    }).then(function () {
+                        Dashboard.hideLoadingMsg();
+                    });
+                });
+
+            document.querySelector('#YtsTorrentsConfigForm')
+                .addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    Dashboard.showLoadingMsg();
+                    ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                        config.YtsBaseUrl = document.querySelector('#YtsBaseUrl').value;
+                        config.QbUrl = document.querySelector('#QbUrl').value;
+                        config.QbUsername = document.querySelector('#QbUsername').value;
+                        config.QbPassword = document.querySelector('#QbPassword').value;
+                        config.QbCategory = document.querySelector('#QbCategory').value;
+                        config.QbStagingSavePath = document.querySelector('#QbStagingSavePath').value;
+                        config.LibraryFolderPath = document.querySelector('#LibraryFolderPath').value;
+                        config.ImportMode = document.querySelector('#ImportMode').value;
+                        config.DeleteFromQbAfterImport = document.querySelector('#DeleteFromQbAfterImport').checked;
+                        return ApiClient.updatePluginConfiguration(pluginId, config);
+                    }).then(Dashboard.processPluginConfigurationUpdateResult).catch(function (err) {
+                        console.error('[YtsTorrents] config save failed', err);
+                        Dashboard.hideLoadingMsg();
+                    });
+                    return false;
+                });
+        })();
+        </script>
+    </div>
+</body>
+</html>

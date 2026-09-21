@@ -1,0 +1,11 @@
+bin/
+obj/
+dist/
+.nuget-cache/
+*.user
+
+dev/data/
+
+# Local tooling artifacts, not part of the project
+.claude/
+.playwright-mcp/
