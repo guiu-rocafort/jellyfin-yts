@@ -6,7 +6,16 @@
     "overview": "Search YTS and download movies straight into your Jellyfin library via qBittorrent.",
     "owner": "guiu-rocafort",
     "category": "MoviesAndShows",
+    "imageUrl": "https://raw.githubusercontent.com/guiu-rocafort/jellyfin-yts/v0.1.1.0/Jellyfin.Plugin.YtsTorrents/thumb.png",
     "versions": [
+      {
+        "version": "0.1.1.0",
+        "changelog": "Fix scheduled downloads polling task waiting up to an hour before its first run after startup. Import subtitle files alongside the video. Log a warning (and eventually mark the download failed) when a tracked torrent goes missing from qBittorrent instead of failing silently. Add progress logging for the polling task. Add a qBittorrent connection test button, sidebar navigation entries, and live download/seeding progress and status in the dashboard page. Restructure the dashboard page so Search opens a modal instead of an inline form. Show a proper plugin icon and version number, and fix the plugin category.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/guiu-rocafort/jellyfin-yts/releases/download/v0.1.1.0/YtsTorrents_0.1.1.0.zip",
+        "checksum": "0e56e70186f0227446caaa198a3b7c29",
+        "timestamp": "2026-09-22T19:33:07Z"
+      },
       {
         "version": "0.1.0.0",
         "changelog": "First release. Search YTS from a dashboard page, send releases to qBittorrent, and automatically import finished downloads into a library folder.",
