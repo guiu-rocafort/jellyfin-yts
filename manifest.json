@@ -1,0 +1,20 @@
+[
+  {
+    "guid": "050cf8c8-72cc-49c4-8522-bf98c4b1b9aa",
+    "name": "YTS Torrents",
+    "description": "Adds a dashboard page to search YTS for movies, send a chosen torrent release to an external qBittorrent instance, and automatically import the finished file into a Jellyfin library folder once the download completes, triggering a library scan.",
+    "overview": "Search YTS and download movies straight into your Jellyfin library via qBittorrent.",
+    "owner": "guiu-rocafort",
+    "category": "MoviesAndShows",
+    "versions": [
+      {
+        "version": "0.1.0.0",
+        "changelog": "First release. Search YTS from a dashboard page, send releases to qBittorrent, and automatically import finished downloads into a library folder.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/guiu-rocafort/jellyfin-yts/releases/download/v0.1.0.0/YtsTorrents_0.1.0.0.zip",
+        "checksum": "90892aec1a11ec4c2c50fdac49dbb8ca",
+        "timestamp": "2026-09-21T19:24:02Z"
+      }
+    ]
+  }
+]
