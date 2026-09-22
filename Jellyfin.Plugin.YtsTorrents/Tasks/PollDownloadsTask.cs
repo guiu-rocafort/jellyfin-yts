@@ -37,6 +37,16 @@ public class PollDownloadsTask : IScheduledTask
     {
         return new[]
         {
+            // Jellyfin's IntervalTrigger schedules a task's very first-ever run a full hour after
+            // startup when it has no prior run recorded (see IntervalTrigger.Start: lastResult is
+            // null -> triggerDate = now.AddHours(1)), regardless of the configured interval below --
+            // and that hour resets on every restart until a run actually completes. A StartupTrigger
+            // sidesteps this entirely by firing ~3s after startup unconditionally; this is the same
+            // pairing Jellyfin's own built-in maintenance tasks use (e.g. Clean Transcode Directory).
+            new TaskTriggerInfo
+            {
+                Type = TaskTriggerInfoType.StartupTrigger,
+            },
             new TaskTriggerInfo
             {
                 Type = TaskTriggerInfoType.IntervalTrigger,

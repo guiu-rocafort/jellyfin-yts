@@ -24,6 +24,11 @@ public class DownloadCoordinator
         ".mkv", ".mp4", ".avi", ".mov", ".wmv", ".m4v", ".ts",
     };
 
+    private static readonly HashSet<string> SubtitleExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".srt", ".sub", ".idx", ".ass", ".ssa", ".vtt",
+    };
+
     private readonly IDownloadClient _downloadClient;
     private readonly PendingDownloadStore _store;
     private readonly ILibraryManager _libraryManager;
@@ -61,8 +66,9 @@ public class DownloadCoordinator
         });
     }
 
-    public IReadOnlyCollection<PendingDownload> ListPending() =>
-        _store.All().Where(p => p.State != PendingState.Completed).ToList();
+    /// <summary>Every tracked download, in-progress and finished alike, most recent first.</summary>
+    public IReadOnlyCollection<PendingDownload> ListDownloads() =>
+        _store.All().OrderByDescending(p => p.AddedUtc).ToList();
 
     public bool IsDownloaded(string hash) =>
         _store.All().Any(p => p.State == PendingState.Completed && string.Equals(p.Hash, hash, StringComparison.OrdinalIgnoreCase));
@@ -70,9 +76,18 @@ public class DownloadCoordinator
     public async Task PollAndImportAsync(IProgress<double> progress, CancellationToken cancellationToken)
     {
         var config = Plugin.Instance!.Configuration;
-        var pendingItems = _store.All().Where(p => p.State == PendingState.Downloading).ToList();
+
+        // Completed items are polled too (not just Downloading) so the UI can show their live
+        // seeding status (uploading, stalled, etc.) rather than freezing at whatever qBittorrent
+        // reported the moment the download finished.
+        var pendingItems = _store.All().Where(p => p.State is PendingState.Downloading or PendingState.Completed).ToList();
         var total = Math.Max(pendingItems.Count, 1);
         var processed = 0;
+
+        if (pendingItems.Count > 0)
+        {
+            _logger.LogInformation("Polling {Count} tracked download(s).", pendingItems.Count);
+        }
 
         foreach (var pending in pendingItems)
         {
@@ -82,13 +97,36 @@ public class DownloadCoordinator
                 var info = await _downloadClient.GetByHashAsync(pending.Hash, cancellationToken).ConfigureAwait(false);
                 if (info is null)
                 {
-                    // Not registered with qBittorrent yet, or removed there manually -- leave it, retry next tick.
+                    if (pending.State == PendingState.Downloading)
+                    {
+                        // Could be a brief registration delay right after StartDownloadAsync, or the
+                        // torrent was removed from qBittorrent outside the plugin -- warn and give up
+                        // after repeated misses rather than sitting in "Downloading" forever with no
+                        // trace of why.
+                        var misses = _consecutiveFailures.AddOrUpdate(pending.Hash, 1, (_, count) => count + 1);
+                        _logger.LogWarning(
+                            "qBittorrent has no record of torrent {Hash} for '{Title}' ({Year}) (attempt {Count})",
+                            pending.Hash, pending.MovieTitle, pending.Year, misses);
+                        if (misses >= 3)
+                        {
+                            Fail(pending, "qBittorrent no longer has a record of this torrent.");
+                        }
+                    }
+
+                    // For a Completed item, this is the expected outcome once DeleteFromQbAfterImport
+                    // has removed it from qBittorrent -- leave its last known status as-is, silently.
                     continue;
                 }
 
                 _consecutiveFailures.TryRemove(pending.Hash, out _);
                 pending.Progress = info.Progress;
                 pending.QbState = info.State;
+
+                if (pending.State != PendingState.Downloading)
+                {
+                    // Completed: just refreshed its seeding status above, nothing else to do.
+                    continue;
+                }
 
                 if (info.IsComplete)
                 {
@@ -171,7 +209,12 @@ public class DownloadCoordinator
             throw new InvalidOperationException($"No video files found under '{contentPath}'.");
         }
 
-        foreach (var src in videoFiles)
+        // Subtitles (e.g. YTS releases commonly ship a Subs/ folder) are flattened into the same
+        // target directory as the video by original filename, same as video files -- previously
+        // these were silently dropped since only VideoExtensions was ever selected here.
+        var subtitleFiles = files.Where(f => SubtitleExtensions.Contains(Path.GetExtension(f))).ToList();
+
+        foreach (var src in videoFiles.Concat(subtitleFiles))
         {
             var dest = Path.Combine(targetDir, Path.GetFileName(src));
             switch (mode)
@@ -188,5 +231,9 @@ public class DownloadCoordinator
                     break;
             }
         }
+
+        _logger.LogInformation(
+            "Imported {VideoCount} video and {SubtitleCount} subtitle file(s) from '{ContentPath}' to '{TargetDir}'",
+            videoFiles.Count, subtitleFiles.Count, contentPath, targetDir);
     }
 }

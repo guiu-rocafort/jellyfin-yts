@@ -9,24 +9,43 @@
             <div class="content-primary">
                 <div class="verticalSection">
                     <h2>YTS Torrents</h2>
-                    <form id="YtsTorrentsSearchForm">
-                        <div class="inputContainer">
-                            <input is="emby-input" type="text" id="YtsSearchQuery" label="Search YTS" placeholder="Movie title..." />
-                        </div>
-                        <button is="emby-button" type="submit" class="raised button-submit block emby-button">
-                            <span>Search</span>
-                        </button>
-                    </form>
-                </div>
-
-                <div class="verticalSection">
-                    <h3>Results</h3>
-                    <div id="YtsSearchResults"></div>
+                    <button is="emby-button" type="button" id="OpenSearchModalButton" class="raised button-submit block emby-button">
+                        <span>Search</span>
+                    </button>
                 </div>
 
                 <div class="verticalSection">
                     <h3>Downloads</h3>
                     <div id="YtsDownloadsList"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search modal: hidden until "Search" is clicked. A hand-rolled overlay rather than any
+             Jellyfin dialog helper, since this page's own script execution and DOM lifecycle already
+             turned out to have several undocumented quirks in 12.1 (see the comment below on
+             pageshow/pagehide) -- a self-contained modal avoids depending on internal APIs that may
+             not behave the same way across versions. -->
+        <div id="YtsSearchModalBackdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 10000; align-items: center; justify-content: center; padding: 1em;">
+            <div id="YtsSearchModalBox" style="background: #101010; border-radius: 6px; padding: 1.5em; max-width: 900px; width: 100%; max-height: 85vh; overflow-y: auto; box-shadow: 0 4px 24px rgba(0,0,0,0.5);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1em;">
+                    <h2 style="margin: 0;">Search YTS</h2>
+                    <button is="emby-button" type="button" id="CloseSearchModalButton" class="raised emby-button" style="min-width: auto;">
+                        <span>Close</span>
+                    </button>
+                </div>
+                <form id="YtsTorrentsSearchForm">
+                    <div class="inputContainer">
+                        <input is="emby-input" type="text" id="YtsSearchQuery" label="Search YTS" placeholder="Movie title..." />
+                    </div>
+                    <button is="emby-button" type="submit" class="raised button-submit block emby-button">
+                        <span>Search</span>
+                    </button>
+                </form>
+
+                <div class="verticalSection">
+                    <h3>Results</h3>
+                    <div id="YtsSearchResults"></div>
                 </div>
             </div>
         </div>
@@ -123,6 +142,15 @@
                 checkingResumeData: 'Checking files',
                 allocating: 'Allocating disk space',
                 moving: 'Moving files',
+                // Seeding states, reported for torrents that already finished downloading and are
+                // still registered with qBittorrent (i.e. DeleteFromQbAfterImport is off).
+                uploading: 'Uploading',
+                forcedUP: 'Uploading (forced)',
+                stalledUP: 'Stalled (seeding)',
+                queuedUP: 'Queued (seeding)',
+                pausedUP: 'Paused (seeding)',
+                stoppedUP: 'Paused (seeding)',
+                checkingUP: 'Checking files',
             };
 
             function progressBarHtml(fraction) {
@@ -136,7 +164,7 @@
             function renderDownloads(items) {
                 var container = document.querySelector('#YtsDownloadsList');
                 if (!items || items.length === 0) {
-                    container.innerHTML = '<p>Nothing pending.</p>';
+                    container.innerHTML = '<p>No downloads yet.</p>';
                     return;
                 }
 
@@ -147,6 +175,11 @@
                     if (item.State === 'Downloading') {
                         statusText = escapeHtml(QB_STATE_LABELS[item.QbState] || item.QbState || 'Downloading');
                         progressCell = progressBarHtml(item.Progress);
+                    } else if (item.State === 'Completed') {
+                        // Downloaded and imported already -- QbState here reflects live seeding
+                        // status (uploading, stalled, etc.), not download progress, so no progress bar.
+                        statusText = escapeHtml(QB_STATE_LABELS[item.QbState] || item.QbState || 'Seeding');
+                        progressCell = '&mdash;';
                     } else if (item.State === 'Failed') {
                         statusText = 'Failed' + (item.LastError ? ' &mdash; ' + escapeHtml(item.LastError) : '');
                         progressCell = '&mdash;';
@@ -172,9 +205,37 @@
                 }).then(renderDownloads);
             }
 
+            function openSearchModal() {
+                document.querySelector('#YtsSearchModalBackdrop').style.display = 'flex';
+                document.querySelector('#YtsSearchQuery').focus();
+            }
+
+            function closeSearchModal() {
+                document.querySelector('#YtsSearchModalBackdrop').style.display = 'none';
+            }
+
+            function onModalKeyDown(e) {
+                if (e.key === 'Escape') {
+                    closeSearchModal();
+                }
+            }
+
+            document.querySelector('#OpenSearchModalButton').addEventListener('click', openSearchModal);
+            document.querySelector('#CloseSearchModalButton').addEventListener('click', closeSearchModal);
+            document.querySelector('#YtsSearchModalBackdrop').addEventListener('click', function (e) {
+                if (e.target === e.currentTarget) {
+                    closeSearchModal();
+                }
+            });
+
             document.querySelector('#YtsTorrentsBrowsePage').addEventListener('pageshow', function () {
                 refreshDownloads();
                 pollHandle = window.setInterval(refreshDownloads, 5000);
+                // Bound to document (not this page's own DOM), so it must be added/removed in step
+                // with pageshow/pagehide -- otherwise it would keep piling up across repeat visits
+                // to this page, since the page's DOM being replaced doesn't detach a document-level
+                // listener on its own.
+                document.addEventListener('keydown', onModalKeyDown);
             });
 
             document.querySelector('#YtsTorrentsBrowsePage').addEventListener('pagehide', function () {
@@ -182,6 +243,8 @@
                     window.clearInterval(pollHandle);
                     pollHandle = null;
                 }
+                document.removeEventListener('keydown', onModalKeyDown);
+                closeSearchModal();
             });
 
             document.querySelector('#YtsTorrentsSearchForm').addEventListener('submit', function (e) {

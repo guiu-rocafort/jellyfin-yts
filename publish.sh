@@ -16,6 +16,7 @@ DEST="${1:-dist/YtsTorrents_${VERSION}}"
 
 mkdir -p "$DEST"
 cp dist/_publish/Jellyfin.Plugin.YtsTorrents.dll "$DEST/"
+cp Jellyfin.Plugin.YtsTorrents/thumb.png "$DEST/"
 
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 sed "s/REPLACED_BY_publish.sh/${TIMESTAMP}/" meta.json.template > "$DEST/meta.json"

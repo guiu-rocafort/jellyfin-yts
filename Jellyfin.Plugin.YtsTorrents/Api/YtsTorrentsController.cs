@@ -115,9 +115,9 @@ public class YtsTorrentsController : ControllerBase
 
     [HttpGet("Downloads")]
     [ProducesResponseType(StatusCodes.Status200OK)]
-    public ActionResult<PendingDownloadDto[]> ListPending()
+    public ActionResult<PendingDownloadDto[]> ListDownloads()
     {
-        var dtos = _coordinator.ListPending()
+        var dtos = _coordinator.ListDownloads()
             .Select(p => new PendingDownloadDto(p.Hash, p.MovieTitle, p.Year, p.State.ToString(), p.LastError, p.AddedUtc, p.Progress, p.QbState))
             .ToArray();
         return Ok(dtos);
