@@ -49,6 +49,16 @@
                     <div id="YtsSearchResults"></div>
                 </div>
             </div>
+            <!-- Download confirmation dialog overlay -->
+            <div id="YtsConfirmationOverlay" class="yts-confirmation-overlay"></div>
+            <div id="YtsConfirmationDialog" class="yts-confirmation-dialog" style="display: none;">
+                <h3 id="YtsConfirmTitle">Confirm Download</h3>
+                <p id="YtsConfirmMessage"></p>
+                <div class="yts-confirmation-dialog-buttons">
+                    <button class="yts-cancel-btn" id="YtsConfirmCancel">Cancel</button>
+                    <button class="yts-confirm-btn" id="YtsConfirmOk">Download</button>
+                </div>
+            </div>
         </div>
         <!-- This <script> MUST be a descendant of the div[data-role="page"] above, not a sibling after
              it: Jellyfin's viewContainer.js parseHtml() extracts only that div (via
@@ -99,6 +109,124 @@
                 color: #b0b0b0;
                 background-color: rgba(0, 0, 0, 0.2);
             }
+            .yts-toast {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #101010;
+                color: #ffffff;
+                padding: 16px 24px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+                z-index: 10001;
+                max-width: 400px;
+                animation: yts-toast-slide-in 0.3s ease-out;
+                border-left: 4px solid #00a4dc;
+            }
+            .yts-toast.yts-toast-success {
+                border-left-color: #66bb6a;
+                background-color: rgba(102, 187, 106, 0.1);
+                color: #66bb6a;
+            }
+            .yts-toast.yts-toast-error {
+                border-left-color: #ff6b6b;
+                background-color: rgba(255, 107, 107, 0.1);
+                color: #ff6b6b;
+            }
+            .yts-toast.yts-toast-info {
+                border-left-color: #00a4dc;
+                background-color: rgba(0, 164, 220, 0.1);
+                color: #00a4dc;
+            }
+            @keyframes yts-toast-slide-in {
+                from {
+                    opacity: 0;
+                    transform: translateX(-50%) translateY(20px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateX(-50%) translateY(0);
+                }
+            }
+            .yts-confirmation-dialog {
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                background: #101010;
+                border-radius: 8px;
+                padding: 24px;
+                z-index: 10002;
+                max-width: 500px;
+                width: 90%;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+                border: 1px solid #333;
+            }
+            .yts-confirmation-dialog h3 {
+                margin: 0 0 12px 0;
+                color: #ffffff;
+                font-size: 1.1em;
+            }
+            .yts-confirmation-dialog p {
+                margin: 0 0 16px 0;
+                color: #b0b0b0;
+                font-size: 0.9em;
+            }
+            .yts-confirmation-dialog-buttons {
+                display: flex;
+                gap: 12px;
+                justify-content: flex-end;
+            }
+            .yts-confirmation-dialog-buttons button {
+                padding: 8px 16px;
+                border-radius: 4px;
+                border: none;
+                font-weight: 500;
+                cursor: pointer;
+                font-size: 0.9em;
+            }
+            .yts-confirmation-dialog-buttons .yts-confirm-btn {
+                background-color: #00a4dc;
+                color: #ffffff;
+            }
+            .yts-confirmation-dialog-buttons .yts-confirm-btn:hover {
+                background-color: #00b4ff;
+            }
+            .yts-confirmation-dialog-buttons .yts-cancel-btn {
+                background-color: #333;
+                color: #b0b0b0;
+            }
+            .yts-confirmation-dialog-buttons .yts-cancel-btn:hover {
+                background-color: #444;
+            }
+            .yts-confirmation-overlay {
+                position: fixed;
+                inset: 0;
+                background: rgba(0, 0, 0, 0.5);
+                z-index: 10001;
+                display: none;
+            }
+            .yts-confirmation-overlay.yts-active {
+                display: block;
+            }
+            @media (max-width: 768px) {
+                #YtsSearchModalBox {
+                    max-width: 95vw;
+                    padding: 1em;
+                }
+                .yts-toast {
+                    max-width: 90%;
+                    left: 5%;
+                    right: 5%;
+                    transform: none;
+                }
+                .yts-confirmation-dialog {
+                    width: 90%;
+                    max-width: 90vw;
+                    padding: 16px;
+                }
+            }
         </style>
         <script type="text/javascript">
         (function () {
@@ -116,6 +244,54 @@
                 var div = document.createElement('div');
                 div.textContent = text == null ? '' : String(text);
                 return div.innerHTML;
+            }
+
+            function showToast(message, type) {
+                var toast = document.createElement('div');
+                toast.className = 'yts-toast yts-toast-' + (type || 'info');
+                toast.textContent = message;
+                document.body.appendChild(toast);
+
+                setTimeout(function () {
+                    toast.style.animation = 'yts-toast-slide-in 0.3s ease-out reverse';
+                    setTimeout(function () {
+                        toast.remove();
+                    }, 300);
+                }, 4000);
+            }
+
+            function showConfirmation(title, message, movieTitle, quality, size, onConfirm) {
+                document.querySelector('#YtsConfirmTitle').textContent = title;
+                var msg = message + '\n\nMovie: ' + escapeHtml(movieTitle) + '\nQuality: ' + escapeHtml(quality) + '\nSize: ' + escapeHtml(size);
+                document.querySelector('#YtsConfirmMessage').textContent = msg;
+
+                document.querySelector('#YtsConfirmationOverlay').classList.add('yts-active');
+                document.querySelector('#YtsConfirmationDialog').style.display = 'block';
+
+                var confirmBtn = document.querySelector('#YtsConfirmOk');
+                var cancelBtn = document.querySelector('#YtsConfirmCancel');
+                var overlay = document.querySelector('#YtsConfirmationOverlay');
+
+                function close() {
+                    document.querySelector('#YtsConfirmationOverlay').classList.remove('yts-active');
+                    document.querySelector('#YtsConfirmationDialog').style.display = 'none';
+                    confirmBtn.removeEventListener('click', confirm);
+                    cancelBtn.removeEventListener('click', cancel);
+                    overlay.removeEventListener('click', cancel);
+                }
+
+                function confirm() {
+                    close();
+                    onConfirm();
+                }
+
+                function cancel() {
+                    close();
+                }
+
+                confirmBtn.addEventListener('click', confirm);
+                cancelBtn.addEventListener('click', cancel);
+                overlay.addEventListener('click', cancel);
             }
 
             function statusBadgeHtml(status) {
@@ -167,7 +343,11 @@
                         var actionCell = torrent.Downloaded
                             ? statusBadgeHtml('Downloaded')
                             : '<button is="emby-button" class="raised emby-button yts-download-btn" ' +
-                              'data-movie-id="' + escapeHtml(movie.MovieId) + '" data-hash="' + escapeHtml(torrent.Hash) + '">' +
+                              'data-movie-id="' + escapeHtml(movie.MovieId) + '" ' +
+                              'data-hash="' + escapeHtml(torrent.Hash) + '" ' +
+                              'data-movie-title="' + escapeHtml(movie.Title) + '" ' +
+                              'data-quality="' + escapeHtml(torrent.Quality) + '" ' +
+                              'data-size="' + escapeHtml(torrent.Size) + '">' +
                               '<span>Download</span></button>';
 
                         var seedsColor = parseInt(torrent.Seeds, 10) > 100 ? '#66bb6a' : (parseInt(torrent.Seeds, 10) > 10 ? '#ffc107' : '#ff6b6b');
@@ -190,25 +370,38 @@
 
                 container.querySelectorAll('.yts-download-btn').forEach(function (btn) {
                     btn.addEventListener('click', function () {
-                        startDownload(btn.getAttribute('data-movie-id'), btn.getAttribute('data-hash'));
+                        var movieId = btn.getAttribute('data-movie-id');
+                        var hash = btn.getAttribute('data-hash');
+                        var movieTitle = btn.getAttribute('data-movie-title');
+                        var quality = btn.getAttribute('data-quality');
+                        var size = btn.getAttribute('data-size');
+
+                        showConfirmation(
+                            'Start Download?',
+                            'This will start downloading the torrent to your qBittorrent client.',
+                            movieTitle,
+                            quality,
+                            size,
+                            function () {
+                                startDownload(movieId, hash, movieTitle, quality);
+                            }
+                        );
                     });
                 });
             }
 
-            function startDownload(movieId, hash) {
-                Dashboard.showLoadingMsg();
+            function startDownload(movieId, hash, movieTitle, quality) {
                 ApiClient.ajax({
                     url: downloadsUrl(),
                     type: 'POST',
                     data: JSON.stringify({ MovieId: parseInt(movieId, 10), Hash: hash }),
                     contentType: 'application/json'
                 }).then(function () {
-                    Dashboard.hideLoadingMsg();
-                    Dashboard.alert('Download started.');
+                    showToast('Downloading: ' + movieTitle + ' (' + quality + ')', 'success');
                     refreshDownloads();
                 }).catch(function (err) {
-                    Dashboard.hideLoadingMsg();
-                    Dashboard.alert('Could not start download: ' + (err && err.statusText ? err.statusText : 'unknown error'));
+                    var errorMsg = err && err.statusText ? err.statusText : 'unknown error';
+                    showToast('Could not start download: ' + errorMsg, 'error');
                 });
             }
 
@@ -379,6 +572,7 @@
             function performSearch() {
                 var query = document.querySelector('#YtsSearchQuery').value;
                 if (!query) {
+                    showToast('Please enter a movie title', 'info');
                     return;
                 }
 
@@ -393,10 +587,15 @@
                     type: 'GET',
                     dataType: 'json'
                 }).then(function (movies) {
+                    if (!movies || movies.length === 0) {
+                        showToast('No results found for "' + query + '"', 'info');
+                    }
                     renderResults(movies);
                 }).catch(function (err) {
+                    var errorMsg = err && err.statusText ? err.statusText : 'unknown error';
                     infoContainer.innerHTML = '';
-                    resultsContainer.innerHTML = '<p style="color: #ff6b6b;">Search failed: ' + escapeHtml(err && err.statusText ? err.statusText : 'unknown error') + '</p>';
+                    resultsContainer.innerHTML = '<p style="color: #ff6b6b;">Search failed: ' + escapeHtml(errorMsg) + '</p>';
+                    showToast('Search error: ' + errorMsg, 'error');
                 });
             }
 
