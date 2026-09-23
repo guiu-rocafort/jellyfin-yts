@@ -210,6 +210,31 @@
             .yts-confirmation-overlay.yts-active {
                 display: block;
             }
+            /* Downloads table row spacing improvements */
+            #YtsDownloadsList .detailTable {
+                border-collapse: separate;
+                border-spacing: 0 8px;
+            }
+            #YtsDownloadsList .detailTable tbody tr {
+                height: 60px;
+                background-color: rgba(0, 0, 0, 0.2);
+                border-radius: 4px;
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            }
+            #YtsDownloadsList .detailTable td {
+                padding: 14px 12px;
+                vertical-align: middle;
+            }
+            #YtsDownloadsList .detailTable td:first-child {
+                border-radius: 4px 0 0 4px;
+            }
+            #YtsDownloadsList .detailTable td:last-child {
+                border-radius: 0 4px 4px 0;
+            }
+            #YtsDownloadsList .detailTable tbody tr:hover {
+                background-color: rgba(0, 180, 255, 0.1);
+                box-shadow: 0 2px 6px rgba(0, 180, 255, 0.2);
+            }
             @media (max-width: 768px) {
                 #YtsSearchModalBox {
                     max-width: 95vw;
@@ -225,6 +250,9 @@
                     width: 90%;
                     max-width: 90vw;
                     padding: 16px;
+                }
+                #YtsDownloadsList .detailTable tbody tr {
+                    height: auto;
                 }
             }
         </style>
