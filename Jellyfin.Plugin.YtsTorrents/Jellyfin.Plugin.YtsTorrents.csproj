@@ -9,7 +9,7 @@
     <!-- Without this, the assembly gets no version at all and Jellyfin's dashboard shows the plugin
          as "0.0.0.0", looking broken/unfinished next to every other plugin's real version. Keep in
          sync with meta.json.template's "version" field. -->
-    <Version>0.1.1.0</Version>
+    <Version>0.2.0.0</Version>
     <EnableDefaultEmbeddedResourceItems>false</EnableDefaultEmbeddedResourceItems>
   </PropertyGroup>
 
