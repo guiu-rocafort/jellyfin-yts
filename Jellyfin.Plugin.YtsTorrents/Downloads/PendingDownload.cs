@@ -33,4 +33,13 @@ public class PendingDownload
 
     /// <summary>Raw qBittorrent torrent state (e.g. "downloading", "stalledDL", "metaDL"), as last polled.</summary>
     public string? QbState { get; set; }
+
+    /// <summary>Download speed in bytes per second, as last reported by qBittorrent.</summary>
+    public long? DownloadSpeed { get; set; }
+
+    /// <summary>Estimated time remaining in seconds, calculated from remaining bytes and current speed.</summary>
+    public long? EstimatedTimeRemaining { get; set; }
+
+    /// <summary>Total bytes uploaded (seeded) after download completion, as reported by qBittorrent.</summary>
+    public long? UploadedBytes { get; set; }
 }

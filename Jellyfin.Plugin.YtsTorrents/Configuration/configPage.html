@@ -2,6 +2,17 @@
 <html lang="en">
 <head>
     <title>YTS Torrents</title>
+    <style>
+        /* Fix emby-input styling to match Jellyfin dark theme */
+        input[is="emby-input"] {
+            background-color: transparent !important;
+            background: transparent !important;
+        }
+
+        input[is="emby-input"]::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+    </style>
 </head>
 <body>
     <div id="YtsTorrentsConfigPage" data-role="page" class="page type-interior pluginConfigurationPage" data-require="emby-input,emby-button,emby-select,emby-checkbox">
@@ -13,59 +24,65 @@
                         <p>Search YTS and send torrents to qBittorrent for download; finished movies are moved into the library folder below and a library scan is triggered automatically.</p>
                     </div>
 
-                    <h3>YTS</h3>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="text" id="YtsBaseUrl" label="YTS API base URL" />
-                        <div class="fieldDescription">Default: https://yts.gg/api/v2 (fallback mirror: https://movies-api.accel.li/api/v2)</div>
+                    <div class="verticalSection">
+                        <h3>YTS</h3>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="YtsBaseUrl" label="YTS API base URL" />
+                            <div class="fieldDescription">Default: https://yts.gg/api/v2 (fallback mirror: https://movies-api.accel.li/api/v2)</div>
+                        </div>
                     </div>
 
-                    <h3>qBittorrent</h3>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="text" id="QbUrl" label="qBittorrent WebUI URL" />
-                        <div class="fieldDescription">e.g. http://qbittorrent:8080. Firewall this port to the Jellyfin host only &mdash; credentials below are stored unencrypted, the same way other Jellyfin plugins store third-party credentials.</div>
-                    </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="text" id="QbUsername" label="qBittorrent username" />
-                    </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="password" id="QbPassword" label="qBittorrent password" />
-                    </div>
-                    <div class="inputContainer">
-                        <button is="emby-button" type="button" id="TestConnectionButton" class="raised block emby-button">
-                            <span>Test connection</span>
-                        </button>
-                        <div id="TestConnectionResult" class="fieldDescription" style="display: none;"></div>
-                    </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="text" id="QbCategory" label="qBittorrent category" />
-                        <div class="fieldDescription">A dedicated category is created in qBittorrent for torrents this plugin adds, so it can tell them apart from your other torrents.</div>
-                    </div>
-                    <div class="inputContainer">
-                        <input is="emby-input" type="text" id="QbStagingSavePath" label="Staging save path (qBittorrent's filesystem view)" />
-                        <div class="fieldDescription">Where qBittorrent downloads files to before they're imported. Must NOT be inside a Jellyfin library folder, so partially-downloaded files are never scanned.</div>
-                    </div>
-
-                    <h3>Library</h3>
-                    <div class="selectContainer">
-                        <select is="emby-select" id="LibraryFolderPath" label="Destination library folder"></select>
-                        <div class="fieldDescription">Finished movies are placed here as "Title (Year)/" folders, matching Jellyfin's standard naming convention.</div>
-                    </div>
-                    <div class="selectContainer">
-                        <select is="emby-select" id="ImportMode" label="Import mode">
-                            <option value="Hardlink">Hardlink (fastest, needs same filesystem as qBittorrent's download path)</option>
-                            <option value="Move">Move</option>
-                            <option value="Copy">Copy (keeps the qBittorrent copy intact)</option>
-                        </select>
-                    </div>
-                    <div class="checkboxContainer">
-                        <label>
-                            <input is="emby-checkbox" type="checkbox" id="DeleteFromQbAfterImport" />
-                            <span>Remove the torrent from qBittorrent after a successful import</span>
-                        </label>
-                        <div class="fieldDescription">Downloaded files are only removed from disk if the import mode is Move (Hardlink/Copy leave the qBittorrent copy alone).</div>
+                    <div class="verticalSection">
+                        <h3>qBittorrent</h3>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="QbUrl" label="qBittorrent WebUI URL" />
+                            <div class="fieldDescription">e.g. http://qbittorrent:8080. Firewall this port to the Jellyfin host only &mdash; credentials below are stored unencrypted, the same way other Jellyfin plugins store third-party credentials.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="QbUsername" label="qBittorrent username" />
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="password" id="QbPassword" label="qBittorrent password" />
+                        </div>
+                        <div class="inputContainer">
+                            <button is="emby-button" type="button" id="TestConnectionButton" class="raised block emby-button">
+                                <span>Test connection</span>
+                            </button>
+                            <div id="TestConnectionResult" class="fieldDescription" style="display: none;"></div>
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="QbCategory" label="qBittorrent category" />
+                            <div class="fieldDescription">A dedicated category is created in qBittorrent for torrents this plugin adds, so it can tell them apart from your other torrents.</div>
+                        </div>
+                        <div class="inputContainer">
+                            <input is="emby-input" type="text" id="QbStagingSavePath" label="Staging save path (qBittorrent's filesystem view)" />
+                            <div class="fieldDescription">Where qBittorrent downloads files to before they're imported. Must NOT be inside a Jellyfin library folder, so partially-downloaded files are never scanned.</div>
+                        </div>
                     </div>
 
-                    <div>
+                    <div class="verticalSection">
+                        <h3>Library</h3>
+                        <div class="selectContainer">
+                            <select is="emby-select" id="LibraryFolderPath" label="Destination library folder"></select>
+                            <div class="fieldDescription">Finished movies are placed here as "Title (Year)/" folders, matching Jellyfin's standard naming convention.</div>
+                        </div>
+                        <div class="selectContainer">
+                            <select is="emby-select" id="ImportMode" label="Import mode">
+                                <option value="Hardlink">Hardlink (fastest, needs same filesystem as qBittorrent's download path)</option>
+                                <option value="Move">Move</option>
+                                <option value="Copy">Copy (keeps the qBittorrent copy intact)</option>
+                            </select>
+                        </div>
+                        <div class="checkboxContainer">
+                            <label>
+                                <input is="emby-checkbox" type="checkbox" id="DeleteFromQbAfterImport" />
+                                <span>Remove the torrent from qBittorrent after a successful import</span>
+                            </label>
+                            <div class="fieldDescription">Downloaded files are only removed from disk if the import mode is Move (Hardlink/Copy leave the qBittorrent copy alone).</div>
+                        </div>
+                    </div>
+
+                    <div class="inputContainer">
                         <button is="emby-button" type="submit" class="raised button-submit block emby-button">
                             <span>Save</span>
                         </button>
