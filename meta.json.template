@@ -1,6 +1,6 @@
 {
   "category": "MoviesAndShows",
-  "changelog": "Major search modal redesign (Phase 1 & 2): Loading indicators with animated spinners. Result count display showing movies and torrents found. Quality highlighting with RECOMMENDED badges for 1080p+ torrents. Enhanced torrent metadata display (type, size, seed health). Smart sorting by quality and seed count. Download confirmation dialog with movie/quality/size details. Toast notifications for success/error feedback with auto-dismiss. Improved error handling with styled messages. Mobile-responsive design for all screen sizes. Downloads table row spacing improvements with visual hierarchy. Enhanced visual styling with rounded corners and subtle shadows.",
+  "changelog": "Fix downloads stuck in \"Importing\" when Jellyfin restarts mid-import: interrupted imports are now retried, and files are written as .partial and renamed into place so a half-copied movie never appears in the library. Already imported movies are no longer marked Failed when qBittorrent is temporarily unreachable. Add help links to the user manual on the settings and search pages. Includes the 0.2.0.0 search redesign: download confirmation, result counts, RECOMMENDED quality badges, seed health, sorting by quality and seeds, and toast notifications.",
   "description": "Adds a dashboard page to search YTS for movies, send a chosen torrent release to an external qBittorrent instance, and automatically import the finished file into a Jellyfin library folder once the download completes, triggering a library scan.",
   "guid": "050cf8c8-72cc-49c4-8522-bf98c4b1b9aa",
   "imagePath": "thumb.png",
@@ -9,5 +9,5 @@
   "owner": "guiu-rocafort",
   "targetAbi": "12.1.0.0",
   "timestamp": "REPLACED_BY_publish.sh",
-  "version": "0.2.0.0"
+  "version": "0.2.1.0"
 }
