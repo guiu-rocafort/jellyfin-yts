@@ -79,8 +79,12 @@ public class DownloadCoordinator
 
         // Completed items are polled too (not just Downloading) so the UI can show their live
         // seeding status (uploading, stalled, etc.) rather than freezing at whatever qBittorrent
-        // reported the moment the download finished.
-        var pendingItems = _store.All().Where(p => p.State is PendingState.Downloading or PendingState.Completed).ToList();
+        // reported the moment the download finished. Importing items are included because Jellyfin
+        // never runs this task concurrently with itself, so any item still Importing when a poll
+        // starts was interrupted mid-import (e.g. by a shutdown) and would otherwise be stuck forever.
+        var pendingItems = _store.All()
+            .Where(p => p.State is PendingState.Downloading or PendingState.Importing or PendingState.Completed)
+            .ToList();
         var total = Math.Max(pendingItems.Count, 1);
         var processed = 0;
 
@@ -97,7 +101,7 @@ public class DownloadCoordinator
                 var info = await _downloadClient.GetByHashAsync(pending.Hash, cancellationToken).ConfigureAwait(false);
                 if (info is null)
                 {
-                    if (pending.State == PendingState.Downloading)
+                    if (pending.State != PendingState.Completed)
                     {
                         // Could be a brief registration delay right after StartDownloadAsync, or the
                         // torrent was removed from qBittorrent outside the plugin -- warn and give up
@@ -122,10 +126,16 @@ public class DownloadCoordinator
                 pending.Progress = info.Progress;
                 pending.QbState = info.State;
 
-                if (pending.State != PendingState.Downloading)
+                if (pending.State == PendingState.Completed)
                 {
-                    // Completed: just refreshed its seeding status above, nothing else to do.
+                    // Just refreshed its seeding status above, nothing else to do.
                     continue;
+                }
+
+                if (pending.State == PendingState.Importing)
+                {
+                    _logger.LogWarning(
+                        "Resuming interrupted import of '{Title}' ({Year})", pending.MovieTitle, pending.Year);
                 }
 
                 if (info.IsComplete)
@@ -136,6 +146,12 @@ public class DownloadCoordinator
                 {
                     Fail(pending, $"qBittorrent reported state '{info.State}'.");
                 }
+            }
+            catch (QBittorrentException ex) when (pending.State == PendingState.Completed)
+            {
+                // Only the seeding-status refresh failed -- the movie is already in the library, so
+                // this must not flip it to Failed. Keep the last known status and try again next poll.
+                _logger.LogWarning(ex, "qBittorrent status refresh failed for imported torrent {Hash}", pending.Hash);
             }
             catch (QBittorrentException ex)
             {
@@ -216,20 +232,7 @@ public class DownloadCoordinator
 
         foreach (var src in videoFiles.Concat(subtitleFiles))
         {
-            var dest = Path.Combine(targetDir, Path.GetFileName(src));
-            switch (mode)
-            {
-                case ImportMode.Hardlink:
-                    HardLinkHelper.CreateOrCopy(src, dest, _logger);
-                    break;
-                case ImportMode.Move:
-                    File.Move(src, dest, true);
-                    break;
-                case ImportMode.Copy:
-                default:
-                    File.Copy(src, dest, true);
-                    break;
-            }
+            FileImporter.Place(src, Path.Combine(targetDir, Path.GetFileName(src)), mode, _logger);
         }
 
         _logger.LogInformation(

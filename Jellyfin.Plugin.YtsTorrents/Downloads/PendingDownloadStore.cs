@@ -12,7 +12,7 @@ namespace Jellyfin.Plugin.YtsTorrents.Downloads;
 /// <summary>
 /// Persists in-flight downloads to a small JSON file under the plugin's data directory so they survive a
 /// Jellyfin restart. On restart, entries just resume being polled -- qBittorrent already has the torrent,
-/// no special recovery logic is needed.
+/// and an entry left Importing by an interrupted import is retried by the next poll.
 /// </summary>
 public class PendingDownloadStore
 {
