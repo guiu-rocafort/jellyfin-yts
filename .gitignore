@@ -9,3 +9,6 @@ dev/data/
 # Local tooling artifacts, not part of the project
 .claude/
 .playwright-mcp/
+
+# Stray screenshots from local testing (docs images live in docs/images/)
+/*.png

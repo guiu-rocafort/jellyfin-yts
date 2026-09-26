@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: User manual
+    url: https://github.com/guiu-rocafort/jellyfin-yts/blob/main/docs/index.md
+    about: Installation, configuration, usage and troubleshooting.

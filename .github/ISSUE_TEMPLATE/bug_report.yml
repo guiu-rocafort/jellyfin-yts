@@ -1,0 +1,42 @@
+name: Bug report
+description: Something isn't working as described in the user manual
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing, please check the [troubleshooting guide](https://github.com/guiu-rocafort/jellyfin-yts/blob/main/docs/troubleshooting.md). Most setup problems (paths, hardlinks, qBittorrent connection) are covered there.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead. Include any error shown in the Downloads list.
+    validations:
+      required: true
+  - type: input
+    id: plugin-version
+    attributes:
+      label: Plugin version
+      placeholder: "0.2.0.0"
+    validations:
+      required: true
+  - type: input
+    id: jellyfin-version
+    attributes:
+      label: Jellyfin version
+      placeholder: "12.1"
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Setup
+      description: How you run Jellyfin and qBittorrent (Docker / bare metal), and your staging save path, library folder and import mode.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From Dashboard → Logs, search for `YtsTorrents`. Remove anything private (passwords, hostnames).
+      render: text
