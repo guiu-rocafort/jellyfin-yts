@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/guiu-rocafort/jellyfin-yts/v0.1.1.0/Jellyfin.Plugin.YtsTorrents/thumb.png",
     "versions": [
       {
+        "version": "0.2.1.0",
+        "changelog": "Fix downloads stuck in \"Importing\" when Jellyfin restarts mid-import: interrupted imports are now retried, and files are written as .partial and renamed into place so a half-copied movie never appears in the library. Already imported movies are no longer marked Failed when qBittorrent is temporarily unreachable. Add help links to the user manual on the settings and search pages. Includes the 0.2.0.0 search redesign: download confirmation, result counts, RECOMMENDED quality badges, seed health, sorting by quality and seeds, and toast notifications.",
+        "targetAbi": "12.1.0.0",
+        "sourceUrl": "https://github.com/guiu-rocafort/jellyfin-yts/releases/download/v0.2.1.0/YtsTorrents_0.2.1.0.zip",
+        "checksum": "016b276c3e47602c685d967cf70fb63b",
+        "timestamp": "2026-09-26T08:26:51Z"
+      },
+      {
         "version": "0.1.1.0",
         "changelog": "Fix scheduled downloads polling task waiting up to an hour before its first run after startup. Import subtitle files alongside the video. Log a warning (and eventually mark the download failed) when a tracked torrent goes missing from qBittorrent instead of failing silently. Add progress logging for the polling task. Add a qBittorrent connection test button, sidebar navigation entries, and live download/seeding progress and status in the dashboard page. Restructure the dashboard page so Search opens a modal instead of an inline form. Show a proper plugin icon and version number, and fix the plugin category.",
         "targetAbi": "12.1.0.0",
